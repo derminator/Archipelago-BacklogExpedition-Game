@@ -1,0 +1,8 @@
+.git
+.github
+**/bin
+**/obj
+**/.vs
+Backlog_Expedition
+deploy
+*.md

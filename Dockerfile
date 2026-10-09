@@ -1,46 +1,19 @@
-# Stage 1: Build
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder
-
 WORKDIR /src
+COPY BEx.Web/BEx.Web.csproj BEx.Web/
+COPY BEx.Core/BEx.Core.csproj BEx.Core/
+RUN dotnet restore BEx.Web/BEx.Web.csproj
+COPY BEx.Web/ BEx.Web/
+COPY BEx.Core/ BEx.Core/
+RUN dotnet publish BEx.Web/BEx.Web.csproj -c Release -o /app/publish --no-restore --self-contained false
 
-# Copy solution and project files
-COPY *.sln ./
-COPY BEx.Web/BEx.Web.csproj ./BEx.Web/
-COPY BEx.Core/BEx.Core.csproj ./BEx.Core/
-COPY Backlog_Expedition/Backlog_Expedition.csproj ./Backlog_Expedition/
-
-# Copy all source code
-COPY BEx.Web/ ./BEx.Web/
-COPY BEx.Core/ ./BEx.Core/
-COPY Backlog_Expedition/ ./Backlog_Expedition/
-
-# Build and publish
-RUN dotnet publish ./BEx.Web/BEx.Web.csproj -c Release -o /app/publish --self-contained false
-
-
-# Stage 2: Runtime
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
-
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
-
-# Create non-root user for security (before copying files)
-RUN useradd -m -u 1000 appuser
-
-# Copy published application from builder
-COPY --from=builder --chown=appuser:appuser /app/publish .
-
-# Create and set permissions for data protection directory
-RUN mkdir -p /home/appuser/.aspnet/DataProtection-Keys && \
-    chown -R appuser:appuser /home/appuser/.aspnet
-
-USER appuser
-
-# Expose port
+RUN groupadd --gid 1000 appuser && useradd --uid 1000 --gid 1000 --create-home appuser \
+    && mkdir -p /mnt/data-protection \
+    && chown 1000:1000 /mnt/data-protection
+COPY --from=builder /app/publish/ ./
+ENV ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://+:8080
+USER 1000:1000
 EXPOSE 8080
-
-# Health check using wget (lightweight alternative)
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -q -O- http://localhost:8080/ || exit 1
-
-# Run application
 ENTRYPOINT ["dotnet", "BEx.Web.dll"]

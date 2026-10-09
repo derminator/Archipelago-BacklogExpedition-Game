@@ -1,0 +1,27 @@
+name: Publish v3 container
+on:
+  push:
+    branches: [container/v3.0.0]
+    paths: [Dockerfile, .dockerignore, 'BEx.Web/**', 'BEx.Core/**', '.github/workflows/container.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  build:
+    if: github.repository == 'derminator/Archipelago-BacklogExpedition-Game'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build and publish
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          IMAGE=ghcr.io/derminator/backlog-expedition
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build --label org.opencontainers.image.source=https://github.com/derminator/Archipelago-BacklogExpedition-Game --label org.opencontainers.image.revision="$GITHUB_SHA" --label org.opencontainers.image.version=3.0.0 -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:v3.0.0" .
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:v3.0.0"
+          docker inspect --format='{{join .RepoDigests "\n"}}' "$IMAGE:$GITHUB_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+          docker logout ghcr.io
